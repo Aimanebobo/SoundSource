@@ -6,9 +6,15 @@ struct HeaderView: View {
 
     var body: some View {
         ZStack {
-            Text("SoundSource")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.primaryText)
+            HStack(spacing: 6) {
+                Image(nsImage: Self.logo)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 18, height: 18)
+                Text("SoundSource")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.primaryText)
+            }
 
             HStack(spacing: 4) {
                 IconButton(systemName: panel.isPinned ? "pin.fill" : "pin",
@@ -45,6 +51,9 @@ struct HeaderView: View {
         .padding(.horizontal, 10)
         .frame(height: 40)
     }
+
+    /// The app icon from Assets.xcassets (AppIcon), the same artwork Finder and the Dock show.
+    private static let logo = NSImage(named: NSImage.applicationIconName) ?? NSImage()
 
     private func gearMenu() -> [MenuItemSpec] {
         [
