@@ -1,3 +1,5 @@
+<img src="docs/logo.png" width="128" alt="SoundSource Clone icon">
+
 # SoundSource Clone
 
 A native macOS menu bar app modelled on Rogue Amoeba's SoundSource: system output/input/alert
@@ -45,6 +47,9 @@ Applications, quits any older copy that is running, and starts the new one when 
 Then click **Allow** for System Audio Recording.
 
 To make the installer from a build on this Mac, run `Scripts/make-pkg.sh <path/to/SoundSourceClone.app> <version> <output.pkg>`.
+
+The app icon is drawn in code by `Scripts/make-icon.swift`. To change it, edit the colours or
+shapes there, then run `swift Scripts/make-icon.swift SoundSourceClone/Assets.xcassets/AppIcon.appiconset docs/logo.png`.
 Set `PKG_SIGN_IDENTITY` to a "Developer ID Installer" identity to sign the package.
 
 ## Get the .pkg and DMG from GitHub (browser only, no Terminal)

@@ -14,9 +14,11 @@ SoundSourceClone/
 │   ├── Info.plist
 │   └── SoundSourceClone.entitlements
 ├── docs/
+│   ├── logo.png
 │   ├── panel-eq.png
 │   └── panel.png
 ├── Scripts/
+│   ├── make-icon.swift
 │   └── make-pkg.sh
 ├── SoundSourceClone.xcodeproj/
 │   ├── xcshareddata/
@@ -32,6 +34,20 @@ SoundSourceClone/
 │   │   ├── MenuBarController.swift
 │   │   ├── SnapshotRenderer.swift
 │   │   └── SoundSourceApp.swift
+│   ├── Assets.xcassets/
+│   │   ├── AppIcon.appiconset/
+│   │   │   ├── Contents.json
+│   │   │   ├── icon_128x128.png
+│   │   │   ├── icon_128x128@2x.png
+│   │   │   ├── icon_16x16.png
+│   │   │   ├── icon_16x16@2x.png
+│   │   │   ├── icon_256x256.png
+│   │   │   ├── icon_256x256@2x.png
+│   │   │   ├── icon_32x32.png
+│   │   │   ├── icon_32x32@2x.png
+│   │   │   ├── icon_512x512.png
+│   │   │   └── icon_512x512@2x.png
+│   │   └── Contents.json
 │   ├── Audio/
 │   │   ├── AlertVolume.swift
 │   │   ├── AppIdentityResolver.swift
@@ -69,7 +85,7 @@ SoundSourceClone/
 └── README.md
 ```
 
-Binary files (screenshots used only by the README, not needed to build): `docs/panel-eq.png`, `docs/panel.png`
+Binary files (screenshots used only by the README, not needed to build): `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_128x128.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_16x16.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_256x256.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_32x32.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_512x512.png`, `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png`, `docs/logo.png`, `docs/panel-eq.png`, `docs/panel.png`
 
 ## Files
 
@@ -333,6 +349,8 @@ dist/
 ### `README.md`
 
 ````markdown
+<img src="docs/logo.png" width="128" alt="SoundSource Clone icon">
+
 # SoundSource Clone
 
 A native macOS menu bar app modelled on Rogue Amoeba's SoundSource: system output/input/alert
@@ -380,6 +398,9 @@ Applications, quits any older copy that is running, and starts the new one when 
 Then click **Allow** for System Audio Recording.
 
 To make the installer from a build on this Mac, run `Scripts/make-pkg.sh <path/to/SoundSourceClone.app> <version> <output.pkg>`.
+
+The app icon is drawn in code by `Scripts/make-icon.swift`. To change it, edit the colours or
+shapes there, then run `swift Scripts/make-icon.swift SoundSourceClone/Assets.xcassets/AppIcon.appiconset docs/logo.png`.
 Set `PKG_SIGN_IDENTITY` to a "Developer ID Installer" identity to sign the package.
 
 ## Get the .pkg and DMG from GitHub (browser only, no Terminal)
@@ -614,6 +635,135 @@ SwiftUI previews (`#Preview` in `PopoverRootView.swift`) use the same sample dat
 	<true/>
 </dict>
 </plist>
+````
+
+### `Scripts/make-icon.swift`
+
+````swift
+// Draws the SoundSource Clone app icon (three mixer sliders on a purple-to-blue squircle) and
+// writes every macOS AppIcon size, each rendered from the vector drawing at its own resolution.
+//
+//   swift Scripts/make-icon.swift SoundSourceClone/Assets.xcassets/AppIcon.appiconset [docs/logo.png]
+//
+// Drawn with plain Core Graphics paths: Apple's SF Symbols license doesn't allow symbols in app icons.
+import CoreGraphics
+import Foundation
+import ImageIO
+import UniformTypeIdentifiers
+
+let arguments = CommandLine.arguments
+guard arguments.count >= 2 else {
+    print("usage: swift make-icon.swift <AppIcon.appiconset> [logo.png]")
+    exit(64)
+}
+let iconSetURL = URL(fileURLWithPath: arguments[1])
+let logoURL = arguments.count > 2 ? URL(fileURLWithPath: arguments[2]) : nil
+let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
+
+func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor {
+    CGColor(colorSpace: sRGB, components: [r, g, b, a])!
+}
+
+/// The whole design on a 1024 × 1024 canvas (origin bottom-left), following Apple's macOS icon grid:
+/// an 824 pt squircle inset 100 pt, with a soft shadow below it.
+func drawIcon(in context: CGContext) {
+    let body = CGRect(x: 100, y: 100, width: 824, height: 824)
+    let bodyPath = CGPath(roundedRect: body, cornerWidth: 185, cornerHeight: 185, transform: nil)
+
+    // Drop shadow
+    context.saveGState()
+    context.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: color(0, 0, 0, 0.35))
+    context.addPath(bodyPath)
+    context.setFillColor(color(0.30, 0.38, 1.0))
+    context.fillPath()
+    context.restoreGState()
+
+    // Background: violet at the top to blue at the bottom, with a soft highlight near the top edge.
+    context.saveGState()
+    context.addPath(bodyPath)
+    context.clip()
+    let background = CGGradient(colorsSpace: sRGB,
+                                colors: [color(0.56, 0.36, 1.0), color(0.36, 0.40, 1.0), color(0.13, 0.47, 1.0)] as CFArray,
+                                locations: [0, 0.5, 1])!
+    context.drawLinearGradient(background, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
+    let glow = CGGradient(colorsSpace: sRGB,
+                          colors: [color(1, 1, 1, 0.28), color(1, 1, 1, 0)] as CFArray,
+                          locations: [0, 1])!
+    context.drawRadialGradient(glow, startCenter: CGPoint(x: 512, y: 900), startRadius: 0,
+                               endCenter: CGPoint(x: 512, y: 900), endRadius: 560, options: [])
+    context.restoreGState()
+
+    // Hairline edge so the icon holds its shape on dark backgrounds.
+    context.saveGState()
+    context.addPath(CGPath(roundedRect: body.insetBy(dx: 2, dy: 2), cornerWidth: 183, cornerHeight: 183, transform: nil))
+    context.setStrokeColor(color(1, 1, 1, 0.18))
+    context.setLineWidth(4)
+    context.strokePath()
+    context.restoreGState()
+
+    // Three mixer channels: track, level fill below the knob, knob with a coloured centre.
+    let trackBottom: CGFloat = 260
+    let trackTop: CGFloat = 764
+    let trackWidth: CGFloat = 46
+    let channels: [(x: CGFloat, knob: CGFloat)] = [(352, 400), (512, 650), (672, 520)]
+    for channel in channels {
+        let track = CGRect(x: channel.x - trackWidth / 2, y: trackBottom, width: trackWidth, height: trackTop - trackBottom)
+        context.addPath(CGPath(roundedRect: track, cornerWidth: trackWidth / 2, cornerHeight: trackWidth / 2, transform: nil))
+        context.setFillColor(color(1, 1, 1, 0.24))
+        context.fillPath()
+
+        let level = CGRect(x: track.minX, y: trackBottom, width: trackWidth, height: channel.knob - trackBottom)
+        context.addPath(CGPath(roundedRect: level, cornerWidth: trackWidth / 2, cornerHeight: trackWidth / 2, transform: nil))
+        context.setFillColor(color(1, 1, 1, 0.92))
+        context.fillPath()
+
+        context.saveGState()
+        context.setShadow(offset: CGSize(width: 0, height: -8), blur: 18, color: color(0.05, 0.05, 0.25, 0.40))
+        context.addEllipse(in: CGRect(x: channel.x - 66, y: channel.knob - 66, width: 132, height: 132))
+        context.setFillColor(color(1, 1, 1))
+        context.fillPath()
+        context.restoreGState()
+
+        context.addEllipse(in: CGRect(x: channel.x - 24, y: channel.knob - 24, width: 48, height: 48))
+        context.setFillColor(color(0.33, 0.42, 1.0))
+        context.fillPath()
+    }
+}
+
+func render(pixels: Int) -> CGImage {
+    let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: sRGB, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    context.interpolationQuality = .high
+    let scale = CGFloat(pixels) / 1024
+    context.scaleBy(x: scale, y: scale)
+    drawIcon(in: context)
+    return context.makeImage()!
+}
+
+func writePNG(_ image: CGImage, to url: URL) {
+    let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
+    CGImageDestinationAddImage(destination, image, nil)
+    guard CGImageDestinationFinalize(destination) else { fatalError("could not write \(url.path)") }
+}
+
+try FileManager.default.createDirectory(at: iconSetURL, withIntermediateDirectories: true)
+var entries: [[String: String]] = []
+for size in [16, 32, 128, 256, 512] {
+    for scale in [1, 2] {
+        let name = "icon_\(size)x\(size)\(scale == 2 ? "@2x" : "").png"
+        writePNG(render(pixels: size * scale), to: iconSetURL.appendingPathComponent(name))
+        entries.append(["filename": name, "idiom": "mac", "scale": "\(scale)x", "size": "\(size)x\(size)"])
+    }
+}
+let contents: [String: Any] = ["images": entries, "info": ["author": "xcode", "version": 1]]
+let json = try JSONSerialization.data(withJSONObject: contents, options: [.prettyPrinted, .sortedKeys])
+try (json + Data("\n".utf8)).write(to: iconSetURL.appendingPathComponent("Contents.json"))
+
+if let logoURL {
+    try FileManager.default.createDirectory(at: logoURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+    writePNG(render(pixels: 1024), to: logoURL)
+}
+print("Wrote \(entries.count) icon sizes to \(iconSetURL.path)")
 ````
 
 ### `Scripts/make-pkg.sh`
@@ -934,6 +1084,7 @@ echo "Created $OUTPUT ($APP_NAME $VERSION, $(du -h "$OUTPUT" | cut -f1 | tr -d '
 		5D000000000000000000000F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/SoundSourceClone.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
@@ -958,6 +1109,7 @@ echo "Created $OUTPUT ($APP_NAME $VERSION, $(du -h "$OUTPUT" | cut -f1 | tr -d '
 		5D0000000000000000000010 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/SoundSourceClone.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
@@ -1547,6 +1699,17 @@ enum SoundSourceMain {
         app.setActivationPolicy(.accessory)
         app.run()
     }
+}
+````
+
+### `SoundSourceClone/Assets.xcassets/Contents.json`
+
+````text
+{
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
 }
 ````
 
@@ -4359,9 +4522,15 @@ struct HeaderView: View {
 
     var body: some View {
         ZStack {
-            Text("SoundSource")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.primaryText)
+            HStack(spacing: 6) {
+                Image(nsImage: Self.logo)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 18, height: 18)
+                Text("SoundSource")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.primaryText)
+            }
 
             HStack(spacing: 4) {
                 IconButton(systemName: panel.isPinned ? "pin.fill" : "pin",
@@ -4398,6 +4567,9 @@ struct HeaderView: View {
         .padding(.horizontal, 10)
         .frame(height: 40)
     }
+
+    /// The app icon from Assets.xcassets (AppIcon), the same artwork Finder and the Dock show.
+    private static let logo = NSImage(named: NSImage.applicationIconName) ?? NSImage()
 
     private func gearMenu() -> [MenuItemSpec] {
         [
@@ -4853,6 +5025,79 @@ enum RowExpansion: Equatable {
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>
+````
+
+### `SoundSourceClone/Assets.xcassets/AppIcon.appiconset/Contents.json`
+
+````text
+{
+  "images" : [
+    {
+      "filename" : "icon_16x16.png",
+      "idiom" : "mac",
+      "scale" : "1x",
+      "size" : "16x16"
+    },
+    {
+      "filename" : "icon_16x16@2x.png",
+      "idiom" : "mac",
+      "scale" : "2x",
+      "size" : "16x16"
+    },
+    {
+      "filename" : "icon_32x32.png",
+      "idiom" : "mac",
+      "scale" : "1x",
+      "size" : "32x32"
+    },
+    {
+      "filename" : "icon_32x32@2x.png",
+      "idiom" : "mac",
+      "scale" : "2x",
+      "size" : "32x32"
+    },
+    {
+      "filename" : "icon_128x128.png",
+      "idiom" : "mac",
+      "scale" : "1x",
+      "size" : "128x128"
+    },
+    {
+      "filename" : "icon_128x128@2x.png",
+      "idiom" : "mac",
+      "scale" : "2x",
+      "size" : "128x128"
+    },
+    {
+      "filename" : "icon_256x256.png",
+      "idiom" : "mac",
+      "scale" : "1x",
+      "size" : "256x256"
+    },
+    {
+      "filename" : "icon_256x256@2x.png",
+      "idiom" : "mac",
+      "scale" : "2x",
+      "size" : "256x256"
+    },
+    {
+      "filename" : "icon_512x512.png",
+      "idiom" : "mac",
+      "scale" : "1x",
+      "size" : "512x512"
+    },
+    {
+      "filename" : "icon_512x512@2x.png",
+      "idiom" : "mac",
+      "scale" : "2x",
+      "size" : "512x512"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
 ````
 
 ### `SoundSourceClone/UI/Components/Controls.swift`
