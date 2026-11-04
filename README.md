@@ -209,3 +209,4 @@ SwiftUI previews (`#Preview` in `PopoverRootView.swift`) use the same sample dat
   that appears when the first tap is created.
 * "SoundSource" is a Rogue Amoeba trademark. Rename the app before sharing or distributing it.
 # SoundSource
+# SoundSource
