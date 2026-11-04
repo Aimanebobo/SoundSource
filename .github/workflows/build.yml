@@ -1,0 +1,227 @@
+# Builds SoundSource Clone on a GitHub macOS runner, packages it as SoundSource-Clone.dmg and
+# attaches the DMG to a GitHub Release.
+#
+# Run it from the browser: Actions tab › "Build DMG" › Run workflow. Pushing a tag such as v1.2.0
+# also runs it.
+#
+# Signing:
+#   • With no secrets set, the app is ad-hoc signed. It works, but macOS asks you once to approve it
+#     (System Settings › Privacy & Security › Open Anyway).
+#   • To get a DMG that opens with no warning at all, add these repository secrets (paid Apple
+#     Developer Program account required); the workflow then signs with Developer ID and notarizes:
+#       DEVELOPER_ID_CERTIFICATE_P12       base64 of your "Developer ID Application" .p12 export
+#       DEVELOPER_ID_CERTIFICATE_PASSWORD  the password you set when exporting the .p12
+#       APPLE_TEAM_ID                      your 10-character Team ID
+#       NOTARY_API_KEY_P8                  contents of the App Store Connect API key (.p8) file
+#       NOTARY_KEY_ID                      that key's Key ID
+#       NOTARY_ISSUER_ID                   your App Store Connect Issuer ID
+
+name: Build DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number, e.g. 1.0.0 (leave empty to use the build number)"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to create the release and upload the DMG
+
+concurrency:
+  group: build-dmg-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash   # GitHub runs this as `bash -eo pipefail`, so any failing command stops the job
+
+jobs:
+  build:
+    name: Build, package and release
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      APP_NAME: SoundSource Clone
+      DMG_NAME: SoundSource-Clone.dmg
+      SCHEME: SoundSourceClone
+      HAS_DEVELOPER_ID: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 != '' }}
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Find the Xcode project
+        run: |
+          # Works whether the project sits at the repository root or one folder down.
+          PBXPROJ=$(find . -path ./build -prune -o -name project.pbxproj -path "*SoundSourceClone.xcodeproj/*" -print | head -n 1)
+          if [[ -z "$PBXPROJ" ]]; then
+            echo "::error::SoundSourceClone.xcodeproj was not found in the repository. Upload the whole project folder."
+            exit 1
+          fi
+          PROJECT_DIR=$(cd "$(dirname "$PBXPROJ")/.." && pwd)
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project folder: $PROJECT_DIR"
+
+      - name: Choose the version number
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            TAG="$GITHUB_REF_NAME"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="${INPUT_VERSION#v}"
+            TAG="v$VERSION"
+          else
+            VERSION="1.0.$GITHUB_RUN_NUMBER"
+            TAG="build-$GITHUB_RUN_NUMBER"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+            echo "::error::Version must look like 1.2 or 1.2.3 (got '$VERSION')."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Building version $VERSION (release tag $TAG)"
+
+      - name: Show the Xcode version
+        run: xcodebuild -version
+
+      - name: Import the Developer ID certificate
+        if: env.HAS_DEVELOPER_ID == 'true'
+        env:
+          DEVELOPER_ID_CERTIFICATE_P12: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          echo "$DEVELOPER_ID_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Build the app (universal, Release)
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cd "$PROJECT_DIR"
+          if [[ "$HAS_DEVELOPER_ID" == "true" ]]; then
+            SIGNING=(CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=Developer ID Application"
+                     "DEVELOPMENT_TEAM=$APPLE_TEAM_ID" "OTHER_CODE_SIGN_FLAGS=--timestamp --keychain $KEYCHAIN")
+          else
+            # Ad-hoc ("Sign to Run Locally"): needs no Apple account, team or certificate.
+            SIGNING=(CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=-" "DEVELOPMENT_TEAM=")
+          fi
+          xcodebuild \
+            -project SoundSourceClone.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            "${SIGNING[@]}" \
+            -quiet build
+          APP_PATH="$RUNNER_TEMP/DerivedData/Build/Products/Release/SoundSourceClone.app"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          echo "Architectures: $(lipo -archs "$APP_PATH/Contents/MacOS/SoundSourceClone")"
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Package SoundSource-Clone.dmg
+        run: |
+          STAGING="$RUNNER_TEMP/dmg"
+          rm -rf "$STAGING" && mkdir -p "$STAGING" "$GITHUB_WORKSPACE/dist"
+          ditto "$APP_PATH" "$STAGING/$APP_NAME.app"
+          ln -s /Applications "$STAGING/Applications"   # drag-to-install target
+          DMG_PATH="$GITHUB_WORKSPACE/dist/$DMG_NAME"
+          # hdiutil occasionally fails with "Resource busy" on CI machines; retry a few times.
+          for attempt in 1 2 3 4; do
+            if hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -fs HFS+ -format UDZO -ov "$DMG_PATH"; then
+              break
+            fi
+            [[ $attempt == 4 ]] && exit 1
+            echo "hdiutil failed, retrying in 5 seconds…"
+            sleep 5
+          done
+          hdiutil verify "$DMG_PATH"
+          echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
+
+      - name: Sign and notarize the DMG
+        if: env.HAS_DEVELOPER_ID == 'true'
+        env:
+          NOTARY_API_KEY_P8: ${{ secrets.NOTARY_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          codesign --force --timestamp --sign "Developer ID Application" --keychain "$KEYCHAIN" "$DMG_PATH"
+          printf '%s\n' "$NOTARY_API_KEY_P8" > "$RUNNER_TEMP/notary-key.p8"
+          xcrun notarytool submit "$DMG_PATH" \
+            --key "$RUNNER_TEMP/notary-key.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --timeout 30m
+          xcrun stapler staple "$DMG_PATH"
+          rm -f "$RUNNER_TEMP/notary-key.p8"
+
+      - name: Write checksum and release notes
+        run: |
+          cd "$GITHUB_WORKSPACE/dist"
+          shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
+          if [[ "$HAS_DEVELOPER_ID" == "true" ]]; then
+            FIRST_OPEN="Signed with Developer ID and notarized by Apple, so it opens normally."
+          else
+            FIRST_OPEN=$(printf '%s\n' \
+              "This build is not notarized, so the first time you open it macOS blocks it:" \
+              "1. Open the app once and click **Done** on the warning." \
+              "2. Go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway** next to SoundSource Clone, then confirm." \
+              "You only do this once.")
+          fi
+          cat > release-notes.md <<EOF
+          ## SoundSource Clone $VERSION
+
+          **Install:** open \`$DMG_NAME\` and drag **$APP_NAME** onto **Applications**. Requires macOS 14.2 or later (Apple silicon and Intel).
+
+          **First launch:** $FIRST_OPEN
+
+          Then click **Allow** when macOS asks for System Audio Recording, which per-app volume needs. The app lives in the menu bar (speaker-cabinet icon); turn on *Launch at Login* from its gear menu.
+
+          SHA-256: \`$(cut -d ' ' -f 1 "$DMG_NAME.sha256")\`
+          EOF
+          cat release-notes.md
+
+      - name: Upload the DMG as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SoundSource-Clone-${{ env.VERSION }}
+          path: |
+            dist/SoundSource-Clone.dmg
+            dist/SoundSource-Clone.dmg.sha256
+          if-no-files-found: error
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "$GITHUB_WORKSPACE/dist"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$DMG_NAME" "$DMG_NAME.sha256" --clobber
+          else
+            gh release create "$TAG" "$DMG_NAME" "$DMG_NAME.sha256" \
+              --title "$APP_NAME $VERSION" \
+              --notes-file release-notes.md \
+              --target "$GITHUB_SHA"
+          fi
+          echo "### Download: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the temporary keychain
+        if: always() && env.HAS_DEVELOPER_ID == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
