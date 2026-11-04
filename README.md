@@ -37,10 +37,21 @@ private aggregate device = [target output device] + [tap]   (tap drift-compensat
 | Orchestration and persistence | `Audio/AudioEngine.swift`, `Model/*` |
 | SwiftUI panel | `UI/*` (custom sliders and meters in `UI/Components/VolumeSlider.swift`, NSMenu-backed pickers in `UI/Components/PopUpMenuButton.swift`) |
 
-## Get a ready-to-install DMG from GitHub (browser only, no Terminal)
+## Install it: the .pkg installer
+
+`SoundSource-Clone.pkg` is a standard macOS installer. Double-click it, click **Continue** and
+**Install**, and enter your Mac password when Installer asks. It puts **SoundSource Clone** in
+Applications, quits any older copy that is running, and starts the new one when it finishes.
+Then click **Allow** for System Audio Recording.
+
+To make the installer from a build on this Mac, run `Scripts/make-pkg.sh <path/to/SoundSourceClone.app> <version> <output.pkg>`.
+Set `PKG_SIGN_IDENTITY` to a "Developer ID Installer" identity to sign the package.
+
+## Get the .pkg and DMG from GitHub (browser only, no Terminal)
 
 `.github/workflows/build.yml` builds the app on GitHub's macOS 26 runner as a universal binary
-(Apple silicon + Intel), packages `SoundSource-Clone.dmg` and attaches it to a GitHub Release.
+(Apple silicon + Intel), packages `SoundSource-Clone.pkg` and `SoundSource-Clone.dmg`, and
+attaches both to a GitHub Release.
 
 1. **Upload the project.** On github.com click **+ › New repository**, name it, and create it
    with nothing added (no README). On the empty repository page click **uploading an existing
@@ -53,12 +64,12 @@ private aggregate device = [target output device] + [tap]   (tap drift-compensat
    **Build DMG** on the left, click **Run workflow** (you can type a version such as `1.0.0`), then
    the green **Run workflow** button. The run takes a few minutes and ends with a green check.
 3. **Download it.** On the repository's **Code** tab, click **Releases** in the right sidebar,
-   open the newest release, and click **SoundSource-Clone.dmg**. Open it and drag
-   **SoundSource Clone** onto **Applications**.
+   open the newest release, and click **SoundSource-Clone.pkg** (or **SoundSource-Clone.dmg**
+   to drag-install instead). Open it and follow the installer.
 
-**First launch.** Without signing secrets the build is ad-hoc signed, so macOS blocks the first
-launch. Click **Done**, then open **System Settings › Privacy & Security** and click **Open
-Anyway** (once). Then click **Allow** for System Audio Recording. To have it start by itself
+**First open.** Without signing secrets the downloads aren't notarized, so macOS blocks the
+first open of the .pkg (or of the app, if you used the DMG). Click **Done**, then open **System
+Settings › Privacy & Security** and click **Open Anyway** (once). Then click **Allow** for System Audio Recording. To have it start by itself
 from then on, turn on **Launch at Login** in the panel's gear menu.
 
 Pushing a tag such as `v1.2.0` also builds and publishes a release. Every run also keeps the DMG
