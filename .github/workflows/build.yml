@@ -1,5 +1,6 @@
-# Builds SoundSource Clone on a GitHub macOS runner, packages it as SoundSource-Clone.dmg and
-# attaches the DMG to a GitHub Release.
+# Builds SoundSource Clone on a GitHub macOS runner, packages it as SoundSource-Clone.pkg (a
+# double-click installer that also starts the app) and SoundSource-Clone.dmg (drag to install),
+# and attaches both to a GitHub Release.
 #
 # Run it from the browser: Actions tab › "Build DMG" › Run workflow. Pushing a tag such as v1.2.0
 # also runs it.
@@ -48,6 +49,7 @@ jobs:
     env:
       APP_NAME: SoundSource Clone
       DMG_NAME: SoundSource-Clone.dmg
+      PKG_NAME: SoundSource-Clone.pkg
       SCHEME: SoundSourceClone
       HAS_DEVELOPER_ID: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 != '' }}
 
@@ -157,6 +159,12 @@ jobs:
           hdiutil verify "$DMG_PATH"
           echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
 
+      - name: Package SoundSource-Clone.pkg
+        run: |
+          # `bash` explicitly: files uploaded through github.com lose their executable bit.
+          bash "$PROJECT_DIR/Scripts/make-pkg.sh" "$APP_PATH" "$VERSION" "$GITHUB_WORKSPACE/dist/$PKG_NAME"
+          pkgutil --check-signature "$GITHUB_WORKSPACE/dist/$PKG_NAME" || true
+
       - name: Sign and notarize the DMG
         if: env.HAS_DEVELOPER_ID == 'true'
         env:
@@ -176,25 +184,28 @@ jobs:
         run: |
           cd "$GITHUB_WORKSPACE/dist"
           shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
+          shasum -a 256 "$PKG_NAME" > "$PKG_NAME.sha256"
           if [[ "$HAS_DEVELOPER_ID" == "true" ]]; then
-            FIRST_OPEN="Signed with Developer ID and notarized by Apple, so it opens normally."
+            FIRST_OPEN="The DMG is signed with Developer ID and notarized by Apple, so it opens normally. The .pkg is unsigned (that needs a separate Developer ID Installer certificate); approve it once as described below."
           else
-            FIRST_OPEN=$(printf '%s\n' \
-              "This build is not notarized, so the first time you open it macOS blocks it:" \
-              "1. Open the app once and click **Done** on the warning." \
-              "2. Go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway** next to SoundSource Clone, then confirm." \
-              "You only do this once.")
+            FIRST_OPEN="This build is not notarized, so macOS blocks the first open."
           fi
           cat > release-notes.md <<EOF
           ## SoundSource Clone $VERSION
 
-          **Install:** open \`$DMG_NAME\` and drag **$APP_NAME** onto **Applications**. Requires macOS 14.2 or later (Apple silicon and Intel).
+          Requires macOS 14.2 or later (Apple silicon and Intel).
 
-          **First launch:** $FIRST_OPEN
+          **Easiest install:** open \`$PKG_NAME\` and click through the installer. It puts **$APP_NAME** in Applications and starts it when it finishes.
+
+          **Or:** open \`$DMG_NAME\` and drag **$APP_NAME** onto **Applications**.
+
+          **First open:** $FIRST_OPEN If macOS says it can't verify the file, click **Done**, go to **System Settings › Privacy & Security**, click **Open Anyway** next to the file's name, and confirm. You only do this once.
 
           Then click **Allow** when macOS asks for System Audio Recording, which per-app volume needs. The app lives in the menu bar (speaker-cabinet icon); turn on *Launch at Login* from its gear menu.
 
-          SHA-256: \`$(cut -d ' ' -f 1 "$DMG_NAME.sha256")\`
+          SHA-256:
+          - \`$PKG_NAME\`: \`$(cut -d ' ' -f 1 "$PKG_NAME.sha256")\`
+          - \`$DMG_NAME\`: \`$(cut -d ' ' -f 1 "$DMG_NAME.sha256")\`
           EOF
           cat release-notes.md
 
@@ -203,6 +214,8 @@ jobs:
         with:
           name: SoundSource-Clone-${{ env.VERSION }}
           path: |
+            dist/SoundSource-Clone.pkg
+            dist/SoundSource-Clone.pkg.sha256
             dist/SoundSource-Clone.dmg
             dist/SoundSource-Clone.dmg.sha256
           if-no-files-found: error
@@ -212,10 +225,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd "$GITHUB_WORKSPACE/dist"
+          ASSETS=("$PKG_NAME" "$PKG_NAME.sha256" "$DMG_NAME" "$DMG_NAME.sha256")
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "$DMG_NAME" "$DMG_NAME.sha256" --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
           else
-            gh release create "$TAG" "$DMG_NAME" "$DMG_NAME.sha256" \
+            gh release create "$TAG" "${ASSETS[@]}" \
               --title "$APP_NAME $VERSION" \
               --notes-file release-notes.md \
               --target "$GITHUB_SHA"
