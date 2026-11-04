@@ -1,10 +1,18 @@
-<img src="docs/logo.png" width="128" alt="SoundSource Clone icon">
+<img src="docs/logo.png" width="128" alt="SoundSource icon">
 
-# SoundSource Clone
+# SoundSource
 
 A native macOS menu bar app modelled on Rogue Amoeba's SoundSource: system output/input/alert
 volume and device selection, plus **per-app volume (0–200 %), mute, balance, 10-band EQ and
 per-app output routing**. Swift 5 language mode, SwiftUI + AppKit, no kernel extension or audio driver.
+A personal project, not affiliated with Rogue Amoeba.
+
+**About the name:** the app shows as **SoundSource** in Finder, Launchpad, the Dock, its menus, the
+installer and releases. Its file in Applications is `SoundSource Clone.app`, so it never overwrites
+Rogue Amoeba's own `SoundSource.app`. Finder still shows it as "SoundSource", via
+`LSHasLocalizedDisplayName` and `en.lproj/InfoPlist.strings`. The project, target and bundle ID
+(`com.example.SoundSourceClone`) keep their original names, so your settings and audio permission
+carry over.
 
 ![Panel](docs/panel.png)
 
@@ -41,8 +49,8 @@ private aggregate device = [target output device] + [tap]   (tap drift-compensat
 
 ## Install it: the .pkg installer
 
-`SoundSource-Clone.pkg` is a standard macOS installer. Double-click it, click **Continue** and
-**Install**, and enter your Mac password when Installer asks. It puts **SoundSource Clone** in
+`SoundSource.pkg` is a standard macOS installer. Double-click it, click **Continue** and
+**Install**, and enter your Mac password when Installer asks. It puts **SoundSource** in
 Applications, quits any older copy that is running, and starts the new one when it finishes.
 Then click **Allow** for System Audio Recording.
 
@@ -55,7 +63,7 @@ Set `PKG_SIGN_IDENTITY` to a "Developer ID Installer" identity to sign the packa
 ## Get the .pkg and DMG from GitHub (browser only, no Terminal)
 
 `.github/workflows/build.yml` builds the app on GitHub's macOS 26 runner as a universal binary
-(Apple silicon + Intel), packages `SoundSource-Clone.pkg` and `SoundSource-Clone.dmg`, and
+(Apple silicon + Intel), packages `SoundSource.pkg` and `SoundSource.dmg`, and
 attaches both to a GitHub Release.
 
 1. **Upload the project.** On github.com click **+ › New repository**, name it, and create it
@@ -69,7 +77,7 @@ attaches both to a GitHub Release.
    **Build DMG** on the left, click **Run workflow** (you can type a version such as `1.0.0`), then
    the green **Run workflow** button. The run takes a few minutes and ends with a green check.
 3. **Download it.** On the repository's **Code** tab, click **Releases** in the right sidebar,
-   open the newest release, and click **SoundSource-Clone.pkg** (or **SoundSource-Clone.dmg**
+   open the newest release, and click **SoundSource.pkg** (or **SoundSource.dmg**
    to drag-install instead). Open it and follow the installer.
 
 **First open.** Without signing secrets the downloads aren't notarized, so macOS blocks the
@@ -110,7 +118,7 @@ and signs, notarizes and staples the DMG:
 3. Press **⌘R**. A speaker icon appears in the menu bar. There is no Dock icon (`LSUIElement`).
 4. On first launch, allow **System Audio Recording**. If you dismissed the prompt, go to
    System Settings › Privacy & Security › Screen & System Audio Recording ›
-   *System Audio Recording Only* and enable **SoundSource Clone**. The panel also shows a
+   *System Audio Recording Only* and enable **SoundSource**. The panel also shows a
    **Grant Access** button.
 5. Play something (Spotify, a YouTube tab). It appears under **Applications** within a moment.
 

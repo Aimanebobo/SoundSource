@@ -93,7 +93,7 @@ final class MenuBarController: NSObject {
             .action("Open SoundSource", symbol: "slider.horizontal.3") { [weak self] in self?.showPanel() },
             .action("Settings…", symbol: "gearshape") { [weak self] in self?.state.openSettings() },
             .separator,
-            .action("Quit SoundSource Clone", symbol: "power") { NSApp.terminate(nil) },
+            .action("Quit SoundSource", symbol: "power") { NSApp.terminate(nil) },
         ])
         MenuBuilder.popUp(menu, below: button)
     }

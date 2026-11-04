@@ -1,6 +1,6 @@
-# Builds SoundSource Clone on a GitHub macOS runner, packages it as SoundSource-Clone.pkg (a
-# double-click installer that also starts the app) and SoundSource-Clone.dmg (drag to install),
-# and attaches both to a GitHub Release.
+# Builds SoundSource on a GitHub macOS runner, packages it as SoundSource.pkg (a double-click
+# installer that also starts the app) and SoundSource.dmg (drag to install), and attaches both
+# to a GitHub Release.
 #
 # Run it from the browser: Actions tab › "Build DMG" › Run workflow. Pushing a tag such as v1.2.0
 # also runs it.
@@ -47,9 +47,12 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
     env:
-      APP_NAME: SoundSource Clone
-      DMG_NAME: SoundSource-Clone.dmg
-      PKG_NAME: SoundSource-Clone.pkg
+      APP_NAME: SoundSource
+      # The bundle's file name; Finder shows it as "SoundSource". It differs so it never
+      # overwrites Rogue Amoeba's SoundSource.app.
+      APP_FILE: SoundSource Clone.app
+      DMG_NAME: SoundSource.dmg
+      PKG_NAME: SoundSource.pkg
       SCHEME: SoundSourceClone
       HAS_DEVELOPER_ID: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 != '' }}
 
@@ -140,11 +143,11 @@ jobs:
           echo "Architectures: $(lipo -archs "$APP_PATH/Contents/MacOS/SoundSourceClone")"
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
-      - name: Package SoundSource-Clone.dmg
+      - name: Package the DMG
         run: |
           STAGING="$RUNNER_TEMP/dmg"
           rm -rf "$STAGING" && mkdir -p "$STAGING" "$GITHUB_WORKSPACE/dist"
-          ditto "$APP_PATH" "$STAGING/$APP_NAME.app"
+          ditto "$APP_PATH" "$STAGING/$APP_FILE"
           ln -s /Applications "$STAGING/Applications"   # drag-to-install target
           DMG_PATH="$GITHUB_WORKSPACE/dist/$DMG_NAME"
           # hdiutil occasionally fails with "Resource busy" on CI machines; retry a few times.
@@ -159,7 +162,7 @@ jobs:
           hdiutil verify "$DMG_PATH"
           echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
 
-      - name: Package SoundSource-Clone.pkg
+      - name: Package the .pkg installer
         run: |
           # `bash` explicitly: files uploaded through github.com lose their executable bit.
           bash "$PROJECT_DIR/Scripts/make-pkg.sh" "$APP_PATH" "$VERSION" "$GITHUB_WORKSPACE/dist/$PKG_NAME"
@@ -191,7 +194,7 @@ jobs:
             FIRST_OPEN="This build is not notarized, so macOS blocks the first open."
           fi
           cat > release-notes.md <<EOF
-          ## SoundSource Clone $VERSION
+          ## $APP_NAME $VERSION
 
           Requires macOS 14.2 or later (Apple silicon and Intel).
 
@@ -209,15 +212,15 @@ jobs:
           EOF
           cat release-notes.md
 
-      - name: Upload the DMG as a workflow artifact
+      - name: Upload the installers as a workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SoundSource-Clone-${{ env.VERSION }}
+          name: SoundSource-${{ env.VERSION }}
           path: |
-            dist/SoundSource-Clone.pkg
-            dist/SoundSource-Clone.pkg.sha256
-            dist/SoundSource-Clone.dmg
-            dist/SoundSource-Clone.dmg.sha256
+            dist/SoundSource.pkg
+            dist/SoundSource.pkg.sha256
+            dist/SoundSource.dmg
+            dist/SoundSource.dmg.sha256
           if-no-files-found: error
 
       - name: Publish the GitHub Release

@@ -3,8 +3,9 @@
 #
 #   Scripts/make-pkg.sh <path/to/SoundSourceClone.app> <version> <output.pkg>
 #
-# The installer puts "SoundSource Clone.app" in /Applications, quits any running copy first, and
-# opens the new copy for the signed-in user when it finishes. Requires macOS 14.2+ to install.
+# The installer (titled "SoundSource") puts "SoundSource Clone.app" in /Applications, which Finder
+# shows as "SoundSource". It quits any running copy first and opens the new copy for the signed-in
+# user when it finishes. Requires macOS 14.2+ to install.
 #
 # Optional: set PKG_SIGN_IDENTITY to a "Developer ID Installer: …" identity to sign the package.
 set -euo pipefail
@@ -17,7 +18,10 @@ fi
 APP_SOURCE=$1
 VERSION=$2
 OUTPUT=$3
-APP_NAME="SoundSource Clone"
+APP_NAME="SoundSource"
+# The bundle's file name differs from its display name so it never overwrites Rogue Amoeba's
+# SoundSource.app; Finder still shows "SoundSource" (LSHasLocalizedDisplayName).
+APP_FILE="SoundSource Clone.app"
 MIN_MACOS="14.2"
 
 [[ -d "$APP_SOURCE/Contents/MacOS" ]] || { echo "error: $APP_SOURCE is not an app bundle" >&2; exit 66; }
@@ -28,9 +32,9 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/soundsource-pkg.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/root/Applications" "$WORK/scripts" "$WORK/resources" "$WORK/packages"
 
-# Payload: the app under the name people see in /Applications.
-ditto --norsrc --noextattr "$APP_SOURCE" "$WORK/root/Applications/$APP_NAME.app"
-codesign --verify --deep --strict "$WORK/root/Applications/$APP_NAME.app"
+# Payload: the app at its install path in /Applications.
+ditto --norsrc --noextattr "$APP_SOURCE" "$WORK/root/Applications/$APP_FILE"
+codesign --verify --deep --strict "$WORK/root/Applications/$APP_FILE"
 
 # By default pkgbuild marks apps "relocatable": Installer would then update any other copy with the
 # same bundle ID (for example an Xcode build) in place instead of installing into /Applications.
@@ -55,7 +59,7 @@ cat > "$WORK/scripts/postinstall" <<SCRIPT
 CONSOLE_USER=\$(/usr/bin/stat -f %Su /dev/console)
 if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ] && [ "\$CONSOLE_USER" != "loginwindow" ]; then
   CONSOLE_UID=\$(/usr/bin/id -u "\$CONSOLE_USER")
-  /bin/launchctl asuser "\$CONSOLE_UID" /usr/bin/sudo -u "\$CONSOLE_USER" /usr/bin/open "/Applications/$APP_NAME.app" || true
+  /bin/launchctl asuser "\$CONSOLE_UID" /usr/bin/sudo -u "\$CONSOLE_USER" /usr/bin/open "/Applications/$APP_FILE" || true
 fi
 exit 0
 SCRIPT

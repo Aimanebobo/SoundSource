@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- Must equal the bundle's file name ("SoundSource Clone.app") for macOS to show the
+	     localized name "SoundSource" from en.lproj/InfoPlist.strings (LSHasLocalizedDisplayName). -->
 	<key>CFBundleDisplayName</key>
 	<string>SoundSource Clone</string>
 	<key>CFBundleExecutable</key>
@@ -13,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>SoundSource</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -22,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
+	<key>LSHasLocalizedDisplayName</key>
+	<true/>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
@@ -31,8 +35,8 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Personal project. Not affiliated with Rogue Amoeba.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>SoundSource Clone captures each app's audio so it can change that app's volume, apply effects and send it to a different output device.</string>
+	<string>SoundSource captures each app's audio so it can change that app's volume, apply effects and send it to a different output device.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SoundSource Clone shows your microphone's input level when you turn on the input meter.</string>
+	<string>SoundSource shows your microphone's input level when you turn on the input meter.</string>
 </dict>
 </plist>
