@@ -61,7 +61,7 @@ private struct PermissionBanner: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.primaryText)
                 Text(denied
-                     ? "Enable SoundSource Clone in System Settings › Privacy & Security › Screen & System Audio Recording."
+                     ? "Enable SoundSource in System Settings › Privacy & Security › Screen & System Audio Recording."
                      : "Allow access to change app volumes, apply effects and route apps to other devices.")
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.secondaryText)

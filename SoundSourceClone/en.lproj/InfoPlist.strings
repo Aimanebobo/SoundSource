@@ -1,0 +1,5 @@
+/* The name Finder, Launchpad, Spotlight and the Dock show. The bundle file itself stays
+   "SoundSource Clone.app" so it never collides with Rogue Amoeba's SoundSource.app; Info.plist
+   sets LSHasLocalizedDisplayName so Finder uses this name instead of the file name. */
+"CFBundleDisplayName" = "SoundSource";
+"CFBundleName" = "SoundSource";

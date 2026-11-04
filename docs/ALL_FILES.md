@@ -61,6 +61,8 @@ SoundSourceClone/
 │   │   ├── Log.swift
 │   │   ├── ProcessTapSession.swift
 │   │   └── StereoProcessor.swift
+│   ├── en.lproj/
+│   │   └── InfoPlist.strings
 │   ├── Model/
 │   │   ├── AppEntry.swift
 │   │   ├── AudioSettings.swift
@@ -92,9 +94,9 @@ Binary files (screenshots used only by the README, not needed to build): `SoundS
 ### `.github/workflows/build.yml`
 
 ````yaml
-# Builds SoundSource Clone on a GitHub macOS runner, packages it as SoundSource-Clone.pkg (a
-# double-click installer that also starts the app) and SoundSource-Clone.dmg (drag to install),
-# and attaches both to a GitHub Release.
+# Builds SoundSource on a GitHub macOS runner, packages it as SoundSource.pkg (a double-click
+# installer that also starts the app) and SoundSource.dmg (drag to install), and attaches both
+# to a GitHub Release.
 #
 # Run it from the browser: Actions tab › "Build DMG" › Run workflow. Pushing a tag such as v1.2.0
 # also runs it.
@@ -141,9 +143,12 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
     env:
-      APP_NAME: SoundSource Clone
-      DMG_NAME: SoundSource-Clone.dmg
-      PKG_NAME: SoundSource-Clone.pkg
+      APP_NAME: SoundSource
+      # The bundle's file name; Finder shows it as "SoundSource". It differs so it never
+      # overwrites Rogue Amoeba's SoundSource.app.
+      APP_FILE: SoundSource Clone.app
+      DMG_NAME: SoundSource.dmg
+      PKG_NAME: SoundSource.pkg
       SCHEME: SoundSourceClone
       HAS_DEVELOPER_ID: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 != '' }}
 
@@ -234,11 +239,11 @@ jobs:
           echo "Architectures: $(lipo -archs "$APP_PATH/Contents/MacOS/SoundSourceClone")"
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
-      - name: Package SoundSource-Clone.dmg
+      - name: Package the DMG
         run: |
           STAGING="$RUNNER_TEMP/dmg"
           rm -rf "$STAGING" && mkdir -p "$STAGING" "$GITHUB_WORKSPACE/dist"
-          ditto "$APP_PATH" "$STAGING/$APP_NAME.app"
+          ditto "$APP_PATH" "$STAGING/$APP_FILE"
           ln -s /Applications "$STAGING/Applications"   # drag-to-install target
           DMG_PATH="$GITHUB_WORKSPACE/dist/$DMG_NAME"
           # hdiutil occasionally fails with "Resource busy" on CI machines; retry a few times.
@@ -253,7 +258,7 @@ jobs:
           hdiutil verify "$DMG_PATH"
           echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
 
-      - name: Package SoundSource-Clone.pkg
+      - name: Package the .pkg installer
         run: |
           # `bash` explicitly: files uploaded through github.com lose their executable bit.
           bash "$PROJECT_DIR/Scripts/make-pkg.sh" "$APP_PATH" "$VERSION" "$GITHUB_WORKSPACE/dist/$PKG_NAME"
@@ -285,7 +290,7 @@ jobs:
             FIRST_OPEN="This build is not notarized, so macOS blocks the first open."
           fi
           cat > release-notes.md <<EOF
-          ## SoundSource Clone $VERSION
+          ## $APP_NAME $VERSION
 
           Requires macOS 14.2 or later (Apple silicon and Intel).
 
@@ -303,15 +308,15 @@ jobs:
           EOF
           cat release-notes.md
 
-      - name: Upload the DMG as a workflow artifact
+      - name: Upload the installers as a workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SoundSource-Clone-${{ env.VERSION }}
+          name: SoundSource-${{ env.VERSION }}
           path: |
-            dist/SoundSource-Clone.pkg
-            dist/SoundSource-Clone.pkg.sha256
-            dist/SoundSource-Clone.dmg
-            dist/SoundSource-Clone.dmg.sha256
+            dist/SoundSource.pkg
+            dist/SoundSource.pkg.sha256
+            dist/SoundSource.dmg
+            dist/SoundSource.dmg.sha256
           if-no-files-found: error
 
       - name: Publish the GitHub Release
@@ -349,13 +354,21 @@ dist/
 ### `README.md`
 
 ````markdown
-<img src="docs/logo.png" width="128" alt="SoundSource Clone icon">
+<img src="docs/logo.png" width="128" alt="SoundSource icon">
 
-# SoundSource Clone
+# SoundSource
 
 A native macOS menu bar app modelled on Rogue Amoeba's SoundSource: system output/input/alert
 volume and device selection, plus **per-app volume (0–200 %), mute, balance, 10-band EQ and
 per-app output routing**. Swift 5 language mode, SwiftUI + AppKit, no kernel extension or audio driver.
+A personal project, not affiliated with Rogue Amoeba.
+
+**About the name:** the app shows as **SoundSource** in Finder, Launchpad, the Dock, its menus, the
+installer and releases. Its file in Applications is `SoundSource Clone.app`, so it never overwrites
+Rogue Amoeba's own `SoundSource.app`. Finder still shows it as "SoundSource", via
+`LSHasLocalizedDisplayName` and `en.lproj/InfoPlist.strings`. The project, target and bundle ID
+(`com.example.SoundSourceClone`) keep their original names, so your settings and audio permission
+carry over.
 
 ![Panel](docs/panel.png)
 
@@ -392,8 +405,8 @@ private aggregate device = [target output device] + [tap]   (tap drift-compensat
 
 ## Install it: the .pkg installer
 
-`SoundSource-Clone.pkg` is a standard macOS installer. Double-click it, click **Continue** and
-**Install**, and enter your Mac password when Installer asks. It puts **SoundSource Clone** in
+`SoundSource.pkg` is a standard macOS installer. Double-click it, click **Continue** and
+**Install**, and enter your Mac password when Installer asks. It puts **SoundSource** in
 Applications, quits any older copy that is running, and starts the new one when it finishes.
 Then click **Allow** for System Audio Recording.
 
@@ -406,7 +419,7 @@ Set `PKG_SIGN_IDENTITY` to a "Developer ID Installer" identity to sign the packa
 ## Get the .pkg and DMG from GitHub (browser only, no Terminal)
 
 `.github/workflows/build.yml` builds the app on GitHub's macOS 26 runner as a universal binary
-(Apple silicon + Intel), packages `SoundSource-Clone.pkg` and `SoundSource-Clone.dmg`, and
+(Apple silicon + Intel), packages `SoundSource.pkg` and `SoundSource.dmg`, and
 attaches both to a GitHub Release.
 
 1. **Upload the project.** On github.com click **+ › New repository**, name it, and create it
@@ -420,7 +433,7 @@ attaches both to a GitHub Release.
    **Build DMG** on the left, click **Run workflow** (you can type a version such as `1.0.0`), then
    the green **Run workflow** button. The run takes a few minutes and ends with a green check.
 3. **Download it.** On the repository's **Code** tab, click **Releases** in the right sidebar,
-   open the newest release, and click **SoundSource-Clone.pkg** (or **SoundSource-Clone.dmg**
+   open the newest release, and click **SoundSource.pkg** (or **SoundSource.dmg**
    to drag-install instead). Open it and follow the installer.
 
 **First open.** Without signing secrets the downloads aren't notarized, so macOS blocks the
@@ -461,7 +474,7 @@ and signs, notarizes and staples the DMG:
 3. Press **⌘R**. A speaker icon appears in the menu bar. There is no Dock icon (`LSUIElement`).
 4. On first launch, allow **System Audio Recording**. If you dismissed the prompt, go to
    System Settings › Privacy & Security › Screen & System Audio Recording ›
-   *System Audio Recording Only* and enable **SoundSource Clone**. The panel also shows a
+   *System Audio Recording Only* and enable **SoundSource**. The panel also shows a
    **Grant Access** button.
 5. Play something (Spotify, a YouTube tab). It appears under **Applications** within a moment.
 
@@ -588,6 +601,8 @@ SwiftUI previews (`#Preview` in `PopoverRootView.swift`) use the same sample dat
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- Must equal the bundle's file name ("SoundSource Clone.app") for macOS to show the
+	     localized name "SoundSource" from en.lproj/InfoPlist.strings (LSHasLocalizedDisplayName). -->
 	<key>CFBundleDisplayName</key>
 	<string>SoundSource Clone</string>
 	<key>CFBundleExecutable</key>
@@ -597,7 +612,7 @@ SwiftUI previews (`#Preview` in `PopoverRootView.swift`) use the same sample dat
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>SoundSource</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -606,6 +621,8 @@ SwiftUI previews (`#Preview` in `PopoverRootView.swift`) use the same sample dat
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
+	<key>LSHasLocalizedDisplayName</key>
+	<true/>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
@@ -615,9 +632,9 @@ SwiftUI previews (`#Preview` in `PopoverRootView.swift`) use the same sample dat
 	<key>NSHumanReadableCopyright</key>
 	<string>Personal project. Not affiliated with Rogue Amoeba.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>SoundSource Clone captures each app's audio so it can change that app's volume, apply effects and send it to a different output device.</string>
+	<string>SoundSource captures each app's audio so it can change that app's volume, apply effects and send it to a different output device.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SoundSource Clone shows your microphone's input level when you turn on the input meter.</string>
+	<string>SoundSource shows your microphone's input level when you turn on the input meter.</string>
 </dict>
 </plist>
 ````
@@ -774,8 +791,9 @@ print("Wrote \(entries.count) icon sizes to \(iconSetURL.path)")
 #
 #   Scripts/make-pkg.sh <path/to/SoundSourceClone.app> <version> <output.pkg>
 #
-# The installer puts "SoundSource Clone.app" in /Applications, quits any running copy first, and
-# opens the new copy for the signed-in user when it finishes. Requires macOS 14.2+ to install.
+# The installer (titled "SoundSource") puts "SoundSource Clone.app" in /Applications, which Finder
+# shows as "SoundSource". It quits any running copy first and opens the new copy for the signed-in
+# user when it finishes. Requires macOS 14.2+ to install.
 #
 # Optional: set PKG_SIGN_IDENTITY to a "Developer ID Installer: …" identity to sign the package.
 set -euo pipefail
@@ -788,7 +806,10 @@ fi
 APP_SOURCE=$1
 VERSION=$2
 OUTPUT=$3
-APP_NAME="SoundSource Clone"
+APP_NAME="SoundSource"
+# The bundle's file name differs from its display name so it never overwrites Rogue Amoeba's
+# SoundSource.app; Finder still shows "SoundSource" (LSHasLocalizedDisplayName).
+APP_FILE="SoundSource Clone.app"
 MIN_MACOS="14.2"
 
 [[ -d "$APP_SOURCE/Contents/MacOS" ]] || { echo "error: $APP_SOURCE is not an app bundle" >&2; exit 66; }
@@ -799,9 +820,9 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/soundsource-pkg.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/root/Applications" "$WORK/scripts" "$WORK/resources" "$WORK/packages"
 
-# Payload: the app under the name people see in /Applications.
-ditto --norsrc --noextattr "$APP_SOURCE" "$WORK/root/Applications/$APP_NAME.app"
-codesign --verify --deep --strict "$WORK/root/Applications/$APP_NAME.app"
+# Payload: the app at its install path in /Applications.
+ditto --norsrc --noextattr "$APP_SOURCE" "$WORK/root/Applications/$APP_FILE"
+codesign --verify --deep --strict "$WORK/root/Applications/$APP_FILE"
 
 # By default pkgbuild marks apps "relocatable": Installer would then update any other copy with the
 # same bundle ID (for example an Xcode build) in place instead of installing into /Applications.
@@ -826,7 +847,7 @@ cat > "$WORK/scripts/postinstall" <<SCRIPT
 CONSOLE_USER=\$(/usr/bin/stat -f %Su /dev/console)
 if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ] && [ "\$CONSOLE_USER" != "loginwindow" ]; then
   CONSOLE_UID=\$(/usr/bin/id -u "\$CONSOLE_USER")
-  /bin/launchctl asuser "\$CONSOLE_UID" /usr/bin/sudo -u "\$CONSOLE_USER" /usr/bin/open "/Applications/$APP_NAME.app" || true
+  /bin/launchctl asuser "\$CONSOLE_UID" /usr/bin/sudo -u "\$CONSOLE_USER" /usr/bin/open "/Applications/$APP_FILE" || true
 fi
 exit 0
 SCRIPT
@@ -1520,7 +1541,7 @@ final class MenuBarController: NSObject {
             .action("Open SoundSource", symbol: "slider.horizontal.3") { [weak self] in self?.showPanel() },
             .action("Settings…", symbol: "gearshape") { [weak self] in self?.state.openSettings() },
             .separator,
-            .action("Quit SoundSource Clone", symbol: "power") { NSApp.terminate(nil) },
+            .action("Quit SoundSource", symbol: "power") { NSApp.terminate(nil) },
         ])
         MenuBuilder.popUp(menu, below: button)
     }
@@ -4122,7 +4143,7 @@ private struct PermissionBanner: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.primaryText)
                 Text(denied
-                     ? "Enable SoundSource Clone in System Settings › Privacy & Security › Screen & System Audio Recording."
+                     ? "Enable SoundSource in System Settings › Privacy & Security › Screen & System Audio Recording."
                      : "Allow access to change app volumes, apply effects and route apps to other devices.")
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.secondaryText)
@@ -4576,11 +4597,11 @@ struct HeaderView: View {
             .action("Settings…", symbol: "gearshape") { panel.openSettings() },
             .action("Launch at Login", checked: LoginItem.isEnabled) { LoginItem.setEnabled(!LoginItem.isEnabled) },
             .separator,
-            .action("About SoundSource Clone", symbol: "info.circle") {
+            .action("About SoundSource", symbol: "info.circle") {
                 NSApp.activate()
                 NSApp.orderFrontStandardAboutPanel(nil)
             },
-            .action("Quit SoundSource Clone", symbol: "power") { NSApp.terminate(nil) },
+            .action("Quit SoundSource", symbol: "power") { NSApp.terminate(nil) },
         ]
     }
 }
@@ -4944,6 +4965,16 @@ enum RowExpansion: Equatable {
     case effects
     case details
 }
+````
+
+### `SoundSourceClone/en.lproj/InfoPlist.strings`
+
+````text
+/* The name Finder, Launchpad, Spotlight and the Dock show. The bundle file itself stays
+   "SoundSource Clone.app" so it never collides with Rogue Amoeba's SoundSource.app; Info.plist
+   sets LSHasLocalizedDisplayName so Finder uses this name instead of the file name. */
+"CFBundleDisplayName" = "SoundSource";
+"CFBundleName" = "SoundSource";
 ````
 
 ### `SoundSourceClone.xcodeproj/xcshareddata/xcschemes/SoundSourceClone.xcscheme`

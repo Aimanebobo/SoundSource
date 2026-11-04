@@ -60,11 +60,11 @@ struct HeaderView: View {
             .action("Settings…", symbol: "gearshape") { panel.openSettings() },
             .action("Launch at Login", checked: LoginItem.isEnabled) { LoginItem.setEnabled(!LoginItem.isEnabled) },
             .separator,
-            .action("About SoundSource Clone", symbol: "info.circle") {
+            .action("About SoundSource", symbol: "info.circle") {
                 NSApp.activate()
                 NSApp.orderFrontStandardAboutPanel(nil)
             },
-            .action("Quit SoundSource Clone", symbol: "power") { NSApp.terminate(nil) },
+            .action("Quit SoundSource", symbol: "power") { NSApp.terminate(nil) },
         ]
     }
 }
